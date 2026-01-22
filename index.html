@@ -1,0 +1,299 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+void main() {
+  runApp(MindFlowUltimate());
+}
+
+class MindFlowUltimate extends StatefulWidget {
+  @override
+  _MindFlowUltimateState createState() => _MindFlowUltimateState();
+}
+
+class _MindFlowUltimateState extends State<MindFlowUltimate> {
+  Locale _locale = Locale('en');
+
+  void setLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'MindFlow Ultimate',
+      locale: _locale,
+      supportedLocales: [
+        Locale('en', ''),
+        Locale('ar', ''),
+      ],
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: HomeScreen(setLocale: setLocale),
+    );
+  }
+}
+
+class AppLocalizations {
+  final Locale locale;
+  late Map<String, String> _localizedStrings;
+  AppLocalizations(this.locale);
+  static AppLocalizations? of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations);
+  }
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+  Future<bool> load() async {
+    String jsonString =
+        await rootBundle.loadString('assets/l10n/${locale.languageCode}.json');
+    Map<String, dynamic> jsonMap = json.decode(jsonString);
+    _localizedStrings =
+        jsonMap.map((key, value) => MapEntry(key, value.toString()));
+    return true;
+  }
+  String translate(String key) {
+    return _localizedStrings[key] ?? key;
+  }
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+  @override
+  bool isSupported(Locale locale) {
+    return ['en', 'ar'].contains(locale.languageCode);
+  }
+  @override
+  Future<AppLocalizations> load(Locale locale) async {
+    AppLocalizations localizations = AppLocalizations(locale);
+    await localizations.load();
+    return localizations;
+  }
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+class HomeScreen extends StatefulWidget {
+  final Function(Locale) setLocale;
+  HomeScreen({required this.setLocale});
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  List<Color> shapes = [];
+  int points = 0;
+  int level = 1;
+  Random random = Random();
+  late AnimationController _controller;
+  Locale selectedLocale = Locale('en');
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: Duration(seconds: 2));
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void generateShape() {
+    setState(() {
+      shapes.add(Color.fromARGB(
+        255,
+        random.nextInt(256),
+        random.nextInt(256),
+        random.nextInt(256),
+      ));
+      points += 10;
+      if (points % 100 == 0) level++;
+    });
+  }
+
+  void resetShapes() {
+    setState(() {
+      shapes.clear();
+      points = 0;
+      level = 1;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Scaffold(
+      body: Stack(
+        children: [
+          GradientBackground(level: level),
+          SafeArea(
+            child: Column(
+              children: [
+                SizedBox(height: 15),
+                PointsDisplay(points: points, level: level, loc: loc),
+                SizedBox(height: 10),
+                Expanded(
+                  child: GridView.builder(
+                    padding: EdgeInsets.all(12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: shapes.length,
+                    itemBuilder: (context, index) {
+                      return AnimatedShape(
+                          color: shapes[index], controller: _controller);
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: generateShape,
+                      icon: Icon(Icons.play_arrow),
+                      label: Text(loc.translate('start_activity')),
+                      style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                              vertical: 15, horizontal: 20)),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: resetShapes,
+                      icon: Icon(Icons.refresh),
+                      label: Text(loc.translate('reset')),
+                      style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                              vertical: 15, horizontal: 20)),
+                    ),
+                    DropdownButton<Locale>(
+                      value: selectedLocale,
+                      dropdownColor: Colors.grey[900],
+                      items: [
+                        DropdownMenuItem(
+                            child: Text('English'), value: Locale('en')),
+                        DropdownMenuItem(
+                            child: Text('العربية'), value: Locale('ar')),
+                      ],
+                      onChanged: (locale) {
+                        setState(() {
+                          selectedLocale = locale!;
+                          widget.setLocale(locale);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 15),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AnimatedShape extends StatelessWidget {
+  final Color color;
+  final AnimationController controller;
+  AnimatedShape({required this.color, required this.controller});
+  @override
+  Widget build(BuildContext context) {
+    double borderRadius = Random().nextInt(30).toDouble();
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 0.9 + 0.2 * controller.value,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                  colors: [color.withOpacity(0.6), color],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.6),
+                  blurRadius: 8,
+                  offset: Offset(3, 3),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class GradientBackground extends StatelessWidget {
+  final int level;
+  GradientBackground({required this.level});
+  @override
+  Widget build(BuildContext context) {
+    List<Color> colors;
+    if (level < 5) {
+      colors = [Colors.deepPurple.shade800, Colors.blueGrey.shade900];
+    } else if (level < 10) {
+      colors = [Colors.indigo.shade700, Colors.teal.shade800];
+    } else {
+      colors = [Colors.orange.shade700, Colors.pink.shade900];
+    }
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+    );
+  }
+}
+
+class PointsDisplay extends StatelessWidget {
+  final int points;
+  final int level;
+  final AppLocalizations loc;
+  PointsDisplay(
+      {required this.points, required this.level, required this.loc});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          loc.translate('app_title'),
+          style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.cyanAccent,
+              shadows: [
+                Shadow(
+                    blurRadius: 8, color: Colors.black45, offset: Offset(2, 2))
+              ]),
+        ),
+        SizedBox(height: 5),
+        Text(
+          '${loc.translate('points')}: $points   ${loc.translate('level')}: $level',
+          style: TextStyle(fontSize: 18, color: Colors.white70),
+        ),
+      ],
+    );
+  }
+}
